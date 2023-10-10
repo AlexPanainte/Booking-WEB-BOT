@@ -5,14 +5,19 @@ from selenium.webdriver.common.by import By
 import os
 import booking.constants as const
 import booking.booking_filtration as bf
+import booking,booking_report as br
+from prettytable import PrettyTable
 
 
 class Booking(webdriver.Chrome):
     def __init__(self, driver_path = const.DRIVER_PATH , teardown=False):
         self.driver_path = driver_path
         self.teardown=teardown
+        options=webdriver.ChromeOptions()
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
         os.environ['PATH'] += self.driver_path
-        super(Booking, self).__init__()
+
+        super(Booking, self).__init__(options=options)
 
         self.implicitly_wait(15)
         self.maximize_window()
@@ -25,47 +30,61 @@ class Booking(webdriver.Chrome):
         self.get(const.BASE_URL)
         
     def change_currency(self, currency):
-        currency_element=self.find_element(By.ID,'button[data-tooltip-text]="Choose your currency')
+        currency_element = self.find_element(By.ID,'button[data-tooltip-text]="Choose your currency')
         currency_element.click()
         selected_currency_element = self.find_element(By.CSS_SELECTOR, f'a[data-modal-header-async-url-param*="selected_currency={currency}"]')
 
     def select_place_to_go(self,place_to_go):
-        search_field=self.find_element(By.ID,'ss')
+        search_field = self.find_element(By.ID,'ss')
         search_field.clear()
         search_field.send_keys(place_to_go)
 
-        first_result=self.find_element(By.CSS_SELECTOR,'li[data-i="0]')
+        first_result = self.find_element(By.CSS_SELECTOR,'li[data-i="0]')
         first_result.click()
     
     def select_data_to_go(self,check_in , check_out ):
-        check_in=self.find_element(By.CSS_SELECTOR,f'td[data-date="{check_in}"]')
+        check_in = self.find_element(By.CSS_SELECTOR,f'td[data-date="{check_in}"]')
         check_in.click()
 
-        check_out=self.find_element(By.CSS_SELECTOR,f'td[data-date="{check_in}"]')
+        check_out = self.find_element(By.CSS_SELECTOR,f'td[data-date="{check_in}"]')
         check_out.click()
     
     def select_adults(self,count):
-        selection_element=self.find_element(By.ID , ' xp__guests__toggle')
+        selection_element = self.find_element(By.ID , ' xp__guests__toggle')
         selection_element.click()
 
         while True:
-            decrease_adult_element=self.find_element(By.CSS_SELECTOR , 'button[aria-label="Decrease number of Adults"]')
+            decrease_adult_element = self.find_element(By.CSS_SELECTOR , 'button[aria-label="Decrease number of Adults"]')
             decrease_adult_element.click()
 
-            adults_value_element=self.find_element(By.ID , 'group_adults')
+            adults_value_element = self.find_element(By.ID , 'group_adults')
             adults_value=adults_value_element.get_attribute()
 
             if int(adults_value) == 1:
                 break
 
-        increase_button_element=self.find_element(By.CSS_SELECTOR , 'button[aria-label="Increase number of Adults"]')
+        increase_button_element = self.find_element(By.CSS_SELECTOR , 'button[aria-label="Increase number of Adults"]')
 
         for i in range(count-1):
             increase_button_element.click()
     
     def click_search(self):
-        search_button=self.find_element(By.CSS_SELECTOR , 'button[type="sumbit"]')
+        search_button = self.find_element(By.CSS_SELECTOR , 'button[type="sumbit"]')
         search_button.click()
 
     def appply_filtration(self):
         filtration=bf.BookingFiltration(driver=self)
+
+        filtration.apply_star_rating()
+        filtration.sort_price_lowest_first()
+    
+    def report_results(self):
+        hotel_boxes = self.find_element(By.ID , 'hotellist_inner')
+        
+        report = br.BookingReport(hotel_boxes)
+        table = PrettyTable( field_names=["Hotel Name", "Hotel Price", "Hotel Score"])
+        table.add_rows(report.pull_deal_box_attributes())
+        print(table)
+
+
+       
